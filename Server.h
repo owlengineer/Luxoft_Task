@@ -13,10 +13,10 @@ public:
 
 	std::cout << "--         method1 called with parameter " << in.a << std::endl;
         
-	std::this_thread::sleep_for(20ms);
+	std::this_thread::sleep_for(100ms);
 	std::cout << "--         method1 calculating..." << std::endl;
 
-	std::this_thread::sleep_for(20ms);
+	std::this_thread::sleep_for(100ms);
 	std::cout << "--         method1 calculating..." << std::endl;
 	
 	return Method_Out{in.a * in.a};
@@ -25,10 +25,10 @@ public:
     virtual Method_Out method2(const Method2_In &in) override {
         std::cout << "--         method2 called with parameters " << in.x << ", " << in.y << std::endl;
 	
-	std::this_thread::sleep_for(20ms);
+	std::this_thread::sleep_for(100ms);
 	std::cout << "--         method2 calculating..." << std::endl;
 
-	std::this_thread::sleep_for(20ms);
+	std::this_thread::sleep_for(100ms);
 	std::cout << "--         method2 calculating..." << std::endl;
         
 	return Method_Out{in.x * in.y};

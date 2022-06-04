@@ -9,29 +9,30 @@
 #include "Buffer.h"
 #include "Connection.h"
 
+#define THREADS_NUM 2
+
 class Receiver {
 public:
     Receiver(std::shared_ptr<Connection>& conn)
             : finish{false}
             , connection(conn)
     {
-        processingThread = std::thread([&]{
-            processing();
-        });
-
         readingThread = std::thread([&]{
             receiving();
         });
 
+	// A num of processing threads
+	for (uint32_t i = 0; i < THREADS_NUM; ++i) 
+        	taskThreads.emplace_back(&Receiver::processing, this);
 
-	// TODO 2 std vector-а указателей на класс-обертку над std::thread. Опрос через processing 
     }
 
     ~Receiver() {
         finish = true;
         cv.notify_all();
-        processingThread.join();
-        readingThread.join();
+	for (uint32_t i = 0; i < THREADS_NUM; ++i) 
+        	taskThreads[i].join();
+	readingThread.join();
     }
 
     void doTask1() {
@@ -71,11 +72,14 @@ public:
                 std::shared_ptr<Buffer> buffer(std::make_shared<Buffer>());
                 buffer->serializeBytes(buf, sz);
                 //Requester("method1", buffer);
-
-                std::shared_ptr<Request> request(std::make_shared<Request>(id, buffer));
+                
+		std::shared_ptr<Request> request(std::make_shared<Request>(id, buffer));
+                
+		std::unique_lock<std::mutex> lk(m);
                 requests.push_back(request);
+		lk.unlock();
 
-                cv.notify_all(); // Not sure that is really need
+                cv.notify_one(); // Not sure that is really need
             }
             CONTEXT_END()
         }
@@ -97,26 +101,17 @@ public:
                 );
 
                 if (finish && requests.empty()) {
-                    //LOG(INFO) << "Exiting processor thread" << std::endl;
+                    LOG(ERROR) << "Exiting processor thread" << std::endl;
                     break;
                 }
 
                 request = requests.front();
                 requests.pop_front();
-                cv.notify_all(); // Not sure that is really need
+		lk.unlock();
+		cv.notify_all(); // Not sure that is really need
 
                 LOG(INFO) << "BUFFER PROCESSING" << std::endl << std::flush;
-		//std::unique_ptr<std::thread> taskThread = std::make_unique<std::thread>(std::thread([&]{
-                //	doBufferProcessing(request->getRequestId(), request->getBuffer());
-		//}));
-		//taskThreads.push(std::move(taskThread));
-	///	auto worker = std::thread([=]{
-           //     	doBufferProcessing(request->getRequestId(), request->getBuffer());
-		//});
-		//worker.detach();
-		//worker.join();
-		//taskThreads.emplace_back(std::move(worker));
-		taskThreads.emplace_back(&Receiver::doBufferProcessing, this, request->getRequestId(), request->getBuffer());
+              	doBufferProcessing(request->getRequestId(), request->getBuffer());
                 //TODO Buffer to argument
             }
 
@@ -145,7 +140,6 @@ public:
 
 private:
     std::thread readingThread;
-    std::thread processingThread;
     std::mutex m;
     std::deque<std::shared_ptr<Request>> requests;
     //std::deque<std::shared_ptr<Request>> doneRequests;
